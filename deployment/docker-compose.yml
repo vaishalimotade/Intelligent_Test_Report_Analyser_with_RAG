@@ -1,0 +1,46 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test_analyzer
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  backend:
+    build:
+      context: ../backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/test_analyzer
+      AZURE_OPENAI_ENDPOINT: https://your-azure-openai-endpoint
+      AZURE_OPENAI_KEY: your-key
+      SLACK_WEBHOOK_URL: https://hooks.slack.com/services/xxx/yyy/zzz
+      EMAIL_SMTP_HOST: smtp.example.com
+      EMAIL_SMTP_PORT: '587'
+      EMAIL_SMTP_USER: user@example.com
+      EMAIL_SMTP_PASSWORD: password
+      NOTIFICATION_FROM_EMAIL: noreply@example.com
+      NOTIFICATION_ADMIN_EMAIL: alerts@example.com
+      CHROMADB_DIR: /data/chromadb
+    depends_on:
+      - db
+    volumes:
+      - chroma_data:/data/chromadb
+    ports:
+      - '8000:8000'
+
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  chroma_data:

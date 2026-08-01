@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-report-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: test-report-frontend
+  template:
+    metadata:
+      labels:
+        app: test-report-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: test-report-analyzer-frontend:latest
+          ports:
+            - containerPort: 3000
