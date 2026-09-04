@@ -1,33 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-report-postgres
+  name: test-report-mongo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-report-postgres
+      app: test-report-mongo
   template:
     metadata:
       labels:
-        app: test-report-postgres
+        app: test-report-mongo
     spec:
       containers:
-        - name: postgres
-          image: postgres:15
+        - name: mongo
+          image: mongo:7
           env:
-            - name: POSTGRES_USER
-              value: postgres
-            - name: POSTGRES_PASSWORD
-              value: postgres
-            - name: POSTGRES_DB
+            - name: MONGO_INITDB_DATABASE
               value: test_analyzer
           ports:
-            - containerPort: 5432
+            - containerPort: 27017
           volumeMounts:
-            - name: postgres-data
-              mountPath: /var/lib/postgresql/data
+            - name: mongo-data
+              mountPath: /data/db
       volumes:
-        - name: postgres-data
+        - name: mongo-data
           persistentVolumeClaim:
-            claimName: postgres-pvc
+            claimName: mongo-pvc

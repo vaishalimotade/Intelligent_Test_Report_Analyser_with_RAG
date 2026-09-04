@@ -2,7 +2,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import List, Dict, Any
 
-from app.models.report_models import TestResultModel
+from ..models.report_models import TestResultModel
 
 
 def _text_or_none(node: ET.Element, path: str) -> str:
@@ -60,6 +60,8 @@ def parse_allure_xml(content: str, source: str, pipeline: str, build_number: str
         test_class = _text_or_none(test_case, 'class-name') or test_case.attrib.get('class')
         module_name = _text_or_none(test_case, 'package')
         status = test_case.attrib.get('status', 'unknown').lower()
+        if status in ('broken', 'error'):
+            status = 'failed'
         execution_time = float(test_case.attrib.get('time', 0.0))
         failure_reason = _text_or_none(test_case, 'failure/message')
         stack_trace = _text_or_none(test_case, 'failure/stack-trace')
@@ -87,6 +89,8 @@ def parse_extent_xml(content: str, source: str, pipeline: str, build_number: str
         test_class = _text_or_none(test, 'class') or test.attrib.get('class')
         module_name = _text_or_none(test, 'test-category')
         status = test.attrib.get('status', 'unknown').lower()
+        if status in ('broken', 'error'):
+            status = 'failed'
         execution_time = float(_text_or_none(test, 'duration') or 0.0)
         failure_reason = _text_or_none(test, 'error/message')
         stack_trace = _text_or_none(test, 'error/stackTrace')

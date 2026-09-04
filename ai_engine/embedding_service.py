@@ -1,8 +1,9 @@
 import os
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 
 
 def get_embeddings():
     return OpenAIEmbeddings(
-        deployment=os.getenv('AZURE_OPENAI_EMBEDDING_DEPLOYMENT', 'text-embedding-3-large'),
+        model=os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-large'),
+        api_key=os.getenv('OPENAI_API_KEY'),
     )

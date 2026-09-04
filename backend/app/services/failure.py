@@ -1,10 +1,8 @@
-from app.services.database import database
-from app.services.storage import result_table
+from .storage import results_collection
 from collections import Counter
 
 async def get_failure_patterns():
-    query = result_table.select().where(result_table.c.status == 'failed')
-    rows = await database.fetch_all(query)
+    rows = list(results_collection.find({"status": "failed"}))
     counter = Counter()
     for row in rows:
         reason = row['failure_reason'] or 'Unknown failure'

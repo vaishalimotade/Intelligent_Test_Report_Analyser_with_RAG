@@ -1,5 +1,4 @@
-from app.services.database import database
-from app.services.storage import result_table
+from .storage import results_collection
 from statistics import mean, stdev
 
 RISK_LEVELS = [
@@ -10,8 +9,7 @@ RISK_LEVELS = [
 ]
 
 async def analyze_flaky_tests():
-    query = result_table.select()
-    rows = await database.fetch_all(query)
+    rows = list(results_collection.find())
     if not rows:
         return []
 

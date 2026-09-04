@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Authentication" tests="3">
+    <testcase name="login_success" classname="AuthTests" time="0.4" />
+    <testcase name="login_invalid_password" classname="AuthTests" time="0.3">
+      <failure message="Authentication failed">Invalid credentials returned by auth service</failure>
+    </testcase>
+    <testcase name="logout" classname="AuthTests" time="0.2" />
+  </testsuite>
+  <testsuite name="Checkout" tests="3">
+    <testcase name="checkout_success" classname="CheckoutTests" time="0.8" />
+    <testcase name="payment_timeout" classname="CheckoutTests" time="1.2" />
+    <testcase name="order_confirmation" classname="CheckoutTests" time="0.6">
+      <failure message="Order status mismatch">Expected CONFIRMED but received PENDING</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

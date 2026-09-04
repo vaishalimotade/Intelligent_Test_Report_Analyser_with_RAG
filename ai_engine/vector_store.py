@@ -1,5 +1,5 @@
 import os
-from langchain.vectorstores import Chroma
+from langchain_chroma import Chroma
 from app.ai_engine.embedding_service import get_embeddings
 
 

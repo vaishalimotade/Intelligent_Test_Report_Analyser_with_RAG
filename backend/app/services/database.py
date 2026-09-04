@@ -1,17 +1,15 @@
 import os
-import databases
-import sqlalchemy
-from sqlalchemy import MetaData
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/test_analyzer")
+from pymongo import MongoClient
 
-database = databases.Database(DATABASE_URL)
-metadata = MetaData()
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "test_analyzer")
+
+mongo_client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=3000)
+database = mongo_client[MONGODB_DATABASE]
 
 async def init_db() -> None:
-    if not database.is_connected:
-        await database.connect()
+    mongo_client.admin.command("ping")
 
 async def shutdown_db() -> None:
-    if database.is_connected:
-        await database.disconnect()
+    mongo_client.close()

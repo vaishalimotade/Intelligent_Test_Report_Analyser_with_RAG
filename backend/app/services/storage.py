@@ -1,102 +1,42 @@
-import sqlalchemy
-from sqlalchemy import Table, Column, Integer, String, Float, DateTime, Text, MetaData
-from app.services.database import database, metadata
 from datetime import datetime
+from .database import database
+from ..ai_engine.vector_store import index_failure_records
 
-report_table = Table(
-    'test_reports',
-    metadata,
-    Column('id', Integer, primary_key=True),
-    Column('source', String, nullable=False),
-    Column('pipeline', String, nullable=False),
-    Column('report_type', String, nullable=False),
-    Column('build_number', String, nullable=False),
-    Column('timestamp', DateTime, nullable=False),
-    Column('created_at', DateTime, default=datetime.utcnow),
-)
-
-result_table = Table(
-    'test_results',
-    metadata,
-    Column('id', Integer, primary_key=True),
-    Column('report_id', Integer, nullable=False),
-    Column('test_name', String, nullable=False),
-    Column('test_class', String, nullable=True),
-    Column('module_name', String, nullable=True),
-    Column('status', String, nullable=False),
-    Column('execution_time', Float, nullable=False),
-    Column('failure_reason', Text, nullable=True),
-    Column('stack_trace', Text, nullable=True),
-    Column('build_number', String, nullable=False),
-    Column('timestamp', DateTime, nullable=False),
-)
-
-failure_patterns_table = Table(
-    'failure_patterns',
-    metadata,
-    Column('id', Integer, primary_key=True),
-    Column('reason', Text, nullable=False),
-    Column('module_name', String, nullable=True),
-    Column('occurrences', Integer, default=0),
-    Column('last_seen', DateTime, nullable=True),
-)
-
-flaky_tests_table = Table(
-    'flaky_tests',
-    metadata,
-    Column('id', Integer, primary_key=True),
-    Column('test_name', String, nullable=False),
-    Column('test_class', String, nullable=True),
-    Column('module_name', String, nullable=True),
-    Column('flaky_score', Float, nullable=False),
-    Column('risk_level', String, nullable=False),
-    Column('confidence_score', Float, nullable=False),
-    Column('last_evaluated', DateTime, nullable=True),
-)
-
-recommendations_table = Table(
-    'recommendations',
-    metadata,
-    Column('id', Integer, primary_key=True),
-    Column('test_name', String, nullable=False),
-    Column('reason', Text, nullable=False),
-    Column('recommendation', Text, nullable=False),
-    Column('created_at', DateTime, default=datetime.utcnow),
-)
-
-quality_digest_table = Table(
-    'quality_digests',
-    metadata,
-    Column('id', Integer, primary_key=True),
-    Column('generation_time', DateTime, nullable=False),
-    Column('summary', Text, nullable=False),
-    Column('html_digest', Text, nullable=False),
-    Column('slack_message', Text, nullable=True),
-)
+reports_collection = database["reports"]
+results_collection = database["test_results"]
+quality_digests_collection = database["quality_digests"]
 
 async def persist_report_records(records):
-    query = report_table.insert().values(
-        source=records[0]['source'],
-        pipeline=records[0]['pipeline'],
-        report_type=records[0]['report_type'],
-        build_number=records[0]['build_number'],
-        timestamp=records[0]['timestamp'],
-    )
-    report_id = await database.execute(query)
-    inserted = 0
+    if not records:
+        return 0
+
+    run_id = f"{records[0]['source']}:{records[0]['pipeline']}:{records[0]['build_number']}:{records[0]['timestamp'].isoformat()}"
+    report = {
+        "source": records[0]["source"],
+        "pipeline": records[0]["pipeline"],
+        "report_type": records[0].get("report_type", "unknown"),
+        "build_number": records[0]["build_number"],
+        "timestamp": records[0]["timestamp"],
+        "created_at": datetime.utcnow(),
+        "run_id": run_id,
+    }
+    report_id = reports_collection.insert_one(report).inserted_id
+    documents = []
     for record in records:
-        result_query = result_table.insert().values(
-            report_id=report_id,
-            test_name=record['test_name'],
-            test_class=record.get('test_class'),
-            module_name=record.get('module_name'),
-            status=record['status'],
-            execution_time=record['execution_time'],
-            failure_reason=record.get('failure_reason'),
-            stack_trace=record.get('stack_trace'),
-            build_number=record['build_number'],
-            timestamp=record['timestamp'],
+        raw_content = (
+            f"Test Name: {record.get('test_name') or 'Unknown test'}\n"
+            f"Final Status: {record.get('status') or 'unknown'}\n"
+            f"Feature: {record.get('module_name') or 'Unknown feature'}\n"
+            f"Error Summary: {record.get('failure_reason') or 'None'}\n"
+            f"Stack Traces / Exception Logs: {record.get('stack_trace') or 'None'}"
         )
-        await database.execute(result_query)
-        inserted += 1
-    return inserted
+        documents.append({**record, "report_id": report_id, "run_id": run_id, "raw_content": raw_content})
+    insert_result = results_collection.insert_many(documents)
+    for document, parent_id in zip(documents, insert_result.inserted_ids):
+        document["_id"] = parent_id
+    rag_error = None
+    try:
+        await index_failure_records(documents)
+    except Exception as error:
+        rag_error = f"RAG indexing skipped: {type(error).__name__}: {error}"
+    return len(documents), rag_error

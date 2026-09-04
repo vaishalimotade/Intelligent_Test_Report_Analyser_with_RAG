@@ -1,15 +1,13 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from app.services.database import database
-from app.services.storage import result_table
+from .storage import results_collection
 
 
 async def get_dashboard_metrics(days: int = 7) -> Dict[str, Any]:
     now = datetime.utcnow()
     window = now - timedelta(days=days)
-    query = result_table.select().where(result_table.c.timestamp >= window)
-    rows = await database.fetch_all(query)
+    rows = list(results_collection.find({"timestamp": {"$gte": window}}))
 
     if not rows:
         return {

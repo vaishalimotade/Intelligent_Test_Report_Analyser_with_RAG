@@ -1,12 +1,10 @@
 import os
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.chat_models import AzureChatOpenAI
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
 from app.ai_engine.embedding_service import get_embeddings
 from app.ai_engine.vector_store import get_vector_store
 
-MODEL_NAME = os.getenv('AZURE_OPENAI_MODEL', 'gpt-4o-mini')
+MODEL_NAME = os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
 
 
 def retrieve_similar_failures(test_name: str):
@@ -32,9 +30,9 @@ def generate_root_cause(test_name: str, similar_failures: list, context: dict):
         similar_failures='; '.join(similar_failures),
         context=context,
     )
-    client = AzureChatOpenAI(deployment_name=os.getenv('AZURE_OPENAI_DEPLOYMENT', MODEL_NAME))
-    response = client.generate([prompt_text])
-    content = response.generations[0][0].text
+    client = ChatOpenAI(model=MODEL_NAME, api_key=os.getenv('OPENAI_API_KEY'))
+    response = client.invoke(prompt_text)
+    content = response.content
     return {
         'root_cause': content,
         'evidence': f'Found {len(similar_failures)} similar historical failures.',

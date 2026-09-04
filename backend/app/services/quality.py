@@ -1,10 +1,11 @@
 from datetime import datetime
+import os
 
-from app.services.analytics import get_dashboard_metrics
-from app.services.database import database
-from app.services.failure import get_failure_patterns
-from app.services.flaky import analyze_flaky_tests
-from app.services.storage import quality_digest_table
+from .analytics import get_dashboard_metrics
+from .failure import get_failure_patterns
+from .flaky import analyze_flaky_tests
+from .storage import quality_digests_collection
+from .llm import LLMService
 
 
 async def generate_quality_digest():
@@ -14,11 +15,21 @@ async def generate_quality_digest():
     patterns = await get_failure_patterns()
     top_failing_modules = [item['module_name'] for item in patterns[:5]]
     quality_score = max(0, 100 - metrics['fail_rate'] - len(top_flaky) * 0.5)
-    ai_commentary = (
+    default_commentary = (
         f"This week saw {metrics['total_executions']} executions with a pass rate of {metrics['pass_rate']:.2f}% and "
         f"a fail rate of {metrics['fail_rate']:.2f}%. Focus on {', '.join(top_failing_modules[:3]) or 'stable areas'} "
         "to reduce recurring issues."
     )
+    ai_commentary = default_commentary
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            llm_result = LLMService().generate_text(
+                context=default_commentary,
+                system_prompt="You are a QA lead. Return a concise executive commentary for a weekly test quality digest.",
+            )
+            ai_commentary = llm_result.get("summary", default_commentary)
+        except (RuntimeError, ValueError):
+            ai_commentary = default_commentary
     recommendations = [
         "Re-run flaky tests with isolated environment",
         "Investigate top failing modules and triage root causes",
@@ -30,14 +41,17 @@ async def generate_quality_digest():
         f"<p>Pass rate: {metrics['pass_rate']:.2f}%</p>"
         f"<p>Fail rate: {metrics['fail_rate']:.2f}%</p>"
     )
-    await database.execute(
-        quality_digest_table.insert().values(
-            generation_time=now,
-            summary=ai_commentary,
-            html_digest=html_digest,
-            slack_message=ai_commentary,
-        )
-    )
+    quality_digests_collection.insert_one({
+        'generation_time': now,
+        'summary': ai_commentary,
+        'html_digest': html_digest,
+        'slack_message': (
+            f"*Weekly Test Quality Digest*\n{ai_commentary}\n"
+            f"• Pass rate: {metrics['pass_rate']:.2f}%\n"
+            f"• Fail rate: {metrics['fail_rate']:.2f}%\n"
+            f"• Top modules: {', '.join(top_failing_modules[:5]) or 'None'}"
+        ),
+    })
     return {
         'total_executions': metrics['total_executions'],
         'pass_rate': metrics['pass_rate'],
@@ -47,4 +61,11 @@ async def generate_quality_digest():
         'quality_score': round(quality_score, 2),
         'ai_commentary': ai_commentary,
         'recommendations': recommendations,
+        'html_digest': html_digest,
+        'slack_message': (
+            f"*Weekly Test Quality Digest*\n{ai_commentary}\n"
+            f"• Pass rate: {metrics['pass_rate']:.2f}%\n"
+            f"• Fail rate: {metrics['fail_rate']:.2f}%\n"
+            f"• Top modules: {', '.join(top_failing_modules[:5]) or 'None'}"
+        ),
     }

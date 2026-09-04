@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
-import { TextField, Button, Typography, Card, CardContent, Grid, Box, Stack, Chip, Divider } from '@mui/material';
+import { Alert, TextField, Button, Typography, Card, CardContent, Grid, Box, Stack, Chip, Divider, CircularProgress } from '@mui/material';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 function RootCausePage() {
   const [testName, setTestName] = useState('Checkout API');
-  const [result, setResult] = useState({
-    root_cause: 'A race condition appears when the payment gateway times out and retries the request.',
-    evidence: 'The same test failed 3 times within 10 minutes and the gateway logs show timeout spikes.',
-    recommendation: 'Add retry jitter and inspect the timeout configuration for the payment gateway.',
-  });
+  const [result, setResult] = useState(null);
+  const [state, setState] = useState({ loading: false, error: '' });
 
-  const handleAnalyze = () => {
-    setResult({
-      root_cause: `Analysis for ${testName}: unstable dependency timing and timeout mismatch.`,
-      evidence: 'The test is flaky under burst load and correlates with increased latency.',
-      recommendation: 'Stabilize the dependency boundary and add more robust waiting logic.',
-    });
+  const handleAnalyze = async () => {
+    if (!testName.trim()) return;
+    setState({ loading: true, error: '' });
+    try {
+      const response = await fetch(`${API_URL}/root-cause/${encodeURIComponent(testName.trim())}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || 'Root-cause analysis failed.');
+      setResult(payload);
+    } catch (error) {
+      setState({ loading: false, error: error.message });
+      return;
+    }
+    setState({ loading: false, error: '' });
   };
 
   return (
@@ -26,7 +32,8 @@ function RootCausePage() {
             <CardContent>
               <Typography variant="h6" mb={2}>Investigate a Failure</Typography>
               <TextField label="Test Name" value={testName} onChange={(e) => setTestName(e.target.value)} fullWidth margin="normal" />
-              <Button variant="contained" onClick={handleAnalyze}>Analyze</Button>
+              <Button variant="contained" onClick={handleAnalyze} disabled={state.loading} startIcon={state.loading ? <CircularProgress size={18} color="inherit" /> : null}>Analyze</Button>
+              {state.error && <Alert severity="error" sx={{ mt: 2 }}>{state.error}</Alert>}
               <Divider sx={{ my: 2 }} />
               <Stack spacing={1.5}>
                 <Box>
@@ -47,13 +54,15 @@ function RootCausePage() {
             <CardContent>
               <Stack direction="row" spacing={1} alignItems="center" mb={2}>
                 <Typography variant="h6">AI Recommendation</Typography>
-                <Chip label="Confidence 92%" color="success" size="small" />
+                {result && <Chip label={`Confidence ${result.confidence || 0}%`} color="success" size="small" />}
               </Stack>
-              <Typography variant="body1" mb={1}>{result.root_cause}</Typography>
-              <Typography variant="subtitle2">Evidence</Typography>
-              <Typography variant="body2" mb={1}>{result.evidence}</Typography>
-              <Typography variant="subtitle2">Recommendation</Typography>
-              <Typography variant="body2">{result.recommendation}</Typography>
+              {result ? <>
+                <Typography variant="body1" mb={1}>{result.root_cause}</Typography>
+                <Typography variant="subtitle2">Evidence</Typography>
+                <Typography variant="body2" mb={1}>{result.evidence}</Typography>
+                <Typography variant="subtitle2">Recommendation</Typography>
+                <Typography variant="body2">{result.recommendation}</Typography>
+              </> : <Typography variant="body2" color="text.secondary">Enter a test name and run an analysis.</Typography>}
             </CardContent>
           </Card>
         </Grid>

@@ -18,15 +18,19 @@ spec:
           ports:
             - containerPort: 8000
           env:
-            - name: DATABASE_URL
-              value: postgresql://postgres:postgres@postgres:5432/test_analyzer
-            - name: AZURE_OPENAI_ENDPOINT
-              value: https://your-azure-openai-endpoint
-            - name: AZURE_OPENAI_KEY
+            - name: MONGODB_URL
+              value: mongodb://test-report-mongo:27017
+            - name: MONGODB_DATABASE
+              value: test_analyzer
+            - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: openai-secret
-                  key: azure-openai-key
+                  key: openai-api-key
+            - name: OPENAI_EMBEDDING_MODEL
+              value: text-embedding-3-large
+            - name: OPENAI_CHAT_MODEL
+              value: gpt-4o-mini
             - name: SLACK_WEBHOOK_URL
               valueFrom:
                 secretKeyRef:

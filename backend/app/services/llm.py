@@ -30,15 +30,15 @@ def build_prompt(context: str, system_prompt: Optional[str] = None, user_templat
 class LLMService:
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
-        self.model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        self.base_url = base_url or os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+        self.model = model or os.getenv("MODEL_NAME") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         self.client = None
         if OpenAI is not None and self.api_key:
             self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def generate_text(self, context: str, system_prompt: Optional[str] = None, user_template: Optional[str] = None) -> Dict[str, Any]:
         if not self.client:
-            raise RuntimeError("LLM client is not configured. Set OPENAI_API_KEY and optionally OPENAI_BASE_URL.")
+            raise RuntimeError("LLM client is not configured. Set OPENAI_API_KEY and optionally LLM_BASE_URL.")
 
         prompt = build_prompt(context, system_prompt=system_prompt, user_template=user_template)
         messages = [

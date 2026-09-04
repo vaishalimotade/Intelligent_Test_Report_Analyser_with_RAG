@@ -1,8 +1,7 @@
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from datetime import datetime
-from typing import List
-from app.services.parser import parse_report
-from app.services.storage import persist_report_records
+from ..services.parser import parse_report
+from ..services.storage import persist_report_records
 
 router = APIRouter()
 
@@ -20,5 +19,10 @@ async def upload_report(
         raise HTTPException(status_code=400, detail="Uploaded report file is empty")
 
     records = parse_report(content.decode("utf-8"), report_type, source, pipeline, build_number, timestamp)
-    inserted = await persist_report_records(records)
-    return {"message": "Report ingested successfully", "ingested_records": inserted}
+    for record in records:
+        record["report_type"] = report_type
+    inserted, rag_error = await persist_report_records(records)
+    result = {"message": "Report ingested successfully", "ingested_records": inserted}
+    if rag_error:
+        result["warning"] = rag_error
+    return result
